@@ -3,6 +3,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.*;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
 public class Customer implements Runnable
 {
     private Table table;
@@ -13,13 +16,13 @@ public class Customer implements Runnable
         this.food = food;
     }
 
-    @Override
     public void run() {
         while(true){
             try {
                 Thread.sleep(100);
             }catch (InterruptedException e){}
             String name = Thread.currentThread().getName();
+
             table.remove(food);
             System.out.println(name+ " ate a"+food);
         }//while
@@ -28,10 +31,10 @@ public class Customer implements Runnable
 class Cook implements Runnable{
     private Table table;
 
-    public Cook(Table table) {
+    Cook(Table table) {
         this.table = table;
     }
-    @Override
+
     public void run() {
         while (true){
             int idx = (int)(Math.random()*table.dishNum());
@@ -41,64 +44,77 @@ class Cook implements Runnable{
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
-        }
+        }//while
     }
 }
 class Table{
     String[] dishNames = {"donut","donut","burger"}; //donut의 확률을 높인다.
     final int MAX_FOOD = 6;
     private ArrayList<String> dishes = new ArrayList<>();
+
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition forCook = lock.newCondition();
+    private Condition forCust = lock.newCondition();
     public synchronized void add(String dish){
-        while(dishes.size() > MAX_FOOD){
-            String name = Thread.currentThread().getName();
-            System.out.println(name+"is waiting.");
-            try {
-                wait(); //wait()으로 lock을 풀고 기다리림
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+        lock.lock();
+        try {
+            while (dishes.size() >= MAX_FOOD){
+                String name = Thread.currentThread().getName();
+                System.out.println(name+" is waiting.");
+                try{
+                    forCook.await(); // wait(); Cook쓰레드를 기다리게 한다.
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
-        }
-        dishes.add(dish);
-        notify();// 기다리고 있는 CUST를 깨우기 위한
-        System.out.println("Dishes:"+dishes.toString());
+            dishes.add(dish);
+            forCust.signal();
+            System.out.println("Dishes:"+dishes.toString());
+        }finally {
+            lock.unlock();
+        }//end try1
     }
     public void remove(String dishName){
-        synchronized (this){
+            lock.lock();
+       // synchronized (this){
             String name = Thread.currentThread().getName();
-
-            while(dishes.size()>0){
-                System.out.println(name+" is waiting.");
-                try {
-                    wait(); //CUST 쓰레드를 기다리게 한다.
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            while(true){
-                for(int i=0; i<dishes.size();i++){
-                    if(dishName.equals(dishes.get(i))){
-                        dishes.remove(i);
-                        notify(); //잠자고 있는 COOK을 깨우기 위함
-                        return;
-                    }
-                }//for문의 끝
-                try {
+            try{
+                while(dishes.size()>0){
                     System.out.println(name+" is waiting.");
-                    wait(); //원하는 음식이 없는 CUST쓰레드를 기다리게 한다.
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    try {
+                        forCust.await(); //wati(); CUST쓰레드를 기다리게 한다.
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
-            }//while(true)
-        }//synchronized
+                while(true){
+                    for(int i=0; i<dishes.size();i++){
+                        if(dishName.equals(dishes.get(i))){
+                            dishes.remove(i);
+                            forCook.signal(); //notify();잠자고 있는  cook을 깨움
+                            return;
+                        }
+                    }//for문의 끝
+                    try {
+                        System.out.println(name+" is waiting.");
+                        forCust.await(); //CUST쓰레드를 기다리게 한다.
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }//while(true)
+            }finally {
+                lock.unlock();
+            }
+
     }
     public int dishNum(){
         return dishNames.length;
     }
-    static class ThreadWaitEx3{
+}
+    class ThreadWaitEx4{
 
         @Test
         public static void main(String[] args) throws Exception{
@@ -108,10 +124,8 @@ class Table{
             new Thread(new Customer(table,"burger"),"CUST2").start();
 
             Thread.sleep(2000);
-            System.exit(10);
+            System.exit(0);
         }
-
-
     }
 
-}
+
