@@ -11,7 +11,7 @@ import static java.util.stream.Collectors.*;
 import static java.util.Comparator.*;
 import java.util.Optional;
 import java.util.stream.Stream;
-
+/*
 class Student {
     String name;
     boolean isMale; //성별
@@ -131,4 +131,4 @@ public class StreamEx7 {
         for(Student s: failedFemaleStu) System.out.println(s);
     }
 }
-
+*/
