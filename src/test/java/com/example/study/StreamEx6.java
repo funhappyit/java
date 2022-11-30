@@ -9,6 +9,7 @@ import static java.util.stream.Collectors.*;
 import java.util.stream.Stream;
 
 public class StreamEx6 {
+    /*
     @Test
     public static void main(String[] args) {
         Student[] stuArr = {
@@ -61,7 +62,10 @@ public class StreamEx6 {
 
 
     }
+
+     */
 }
+/*
 class Student implements Comparable<Student>{
     String name;
     int ban;
@@ -95,3 +99,5 @@ class Student implements Comparable<Student>{
         return s.totalScore - this.totalScore;
     }
 }
+
+ */
